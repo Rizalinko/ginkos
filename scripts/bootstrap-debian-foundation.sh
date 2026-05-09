@@ -67,6 +67,7 @@ case "$SAFE_OUTPUT_DIR" in
     ;;
 esac
 OUTPUT_DIR="$SAFE_OUTPUT_DIR"
+MARKER_FILE="$OUTPUT_DIR/.rizzos-rootfs"
 
 ROOT_CMD=()
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
@@ -81,11 +82,14 @@ if [[ "$DRY_RUN" == false ]]; then
 fi
 
 run_cmd mkdir -p "$(dirname "$OUTPUT_DIR")"
-if [[ -z "$OUTPUT_DIR" || "$OUTPUT_DIR" != /* ]]; then
-  echo "Refusing invalid output directory: $OUTPUT_DIR" >&2
-  exit 1
+if [[ -d "$OUTPUT_DIR" ]]; then
+  if [[ ! -f "$MARKER_FILE" ]]; then
+    echo "Refusing to delete unmanaged directory: $OUTPUT_DIR" >&2
+    echo "Create a clean path or place $MARKER_FILE to confirm management." >&2
+    exit 1
+  fi
+  run_cmd "${ROOT_CMD[@]}" rm -rf "$OUTPUT_DIR"
 fi
-run_cmd "${ROOT_CMD[@]}" rm -rf "$OUTPUT_DIR"
 if ! run_cmd "${ROOT_CMD[@]}" debootstrap --arch="$ARCH" --variant=minbase "$RELEASE" "$OUTPUT_DIR" "$MIRROR"; then
   echo "debootstrap failed. Verify release, mirror, and network connectivity." >&2
   exit 1
@@ -98,5 +102,6 @@ while IFS= read -r package; do
     exit 1
   fi
 done < "$PACKAGE_LIST"
+run_cmd "${ROOT_CMD[@]}" touch "$MARKER_FILE"
 
 echo "Debian foundation created at: $OUTPUT_DIR"

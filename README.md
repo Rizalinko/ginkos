@@ -26,3 +26,6 @@ Optional flags:
 - `--mirror <url>` (default: `http://deb.debian.org/debian`)
 - `--output <path>` (default: `./build/rootfs`)
 - `--dry-run` to print commands without executing them
+
+> Safety: existing output directories are removed only when they already contain
+> the `.rizzos-rootfs` marker file created by a prior successful run.
