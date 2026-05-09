@@ -116,7 +116,7 @@ jobs:
             - `ginkos-sysinfo` — gink-info, gink-freeze, gink-audit
 
             ### Install
-```bash
+            ```bash
             dpkg -i ginkos-defaults.deb ginkos-sysinfo.deb
-```
+            ```
           files: packages/*.deb
