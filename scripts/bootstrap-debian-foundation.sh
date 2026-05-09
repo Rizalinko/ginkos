@@ -91,10 +91,14 @@ if [[ -d "$OUTPUT_DIR" ]]; then
   run_cmd "${ROOT_CMD[@]}" rm -rf "$OUTPUT_DIR"
 fi
 if ! run_cmd "${ROOT_CMD[@]}" debootstrap --arch="$ARCH" --variant=minbase "$RELEASE" "$OUTPUT_DIR" "$MIRROR"; then
-  echo "debootstrap failed. Verify release, mirror, and network connectivity." >&2
+  echo "debootstrap failed for release=$RELEASE arch=$ARCH mirror=$MIRROR." >&2
+  echo "Verify release, architecture, mirror, and network connectivity." >&2
   exit 1
 fi
-run_cmd "${ROOT_CMD[@]}" chroot "$OUTPUT_DIR" apt-get update
+if ! run_cmd "${ROOT_CMD[@]}" chroot "$OUTPUT_DIR" apt-get update; then
+  echo "apt-get update failed inside $OUTPUT_DIR." >&2
+  exit 1
+fi
 while IFS= read -r package; do
   [[ -z "$package" || "$package" == \#* ]] && continue
   if ! run_cmd "${ROOT_CMD[@]}" chroot "$OUTPUT_DIR" apt-get install -y "$package"; then
