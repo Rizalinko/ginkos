@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+"""
+gink-info — GinkOS system information and manifest validator
+Part of GinkOS 1.0 (maidenhair)
+"""
+
+import os
+import sys
+import json
+import shutil
+import socket
+import subprocess
+from pathlib import Path
+from datetime import timedelta
+
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.panel import Panel
+    from rich.columns import Columns
+    from rich import box
+except ImportError:
+    print("GinkOS: rich library not found. Run: apt install python3-rich")
+    sys.exit(1)
+
+# ── GinkOS color theme ─────────────────────────────────────────
+GOLD    = "#C8A951"
+DARK    = "#1A1A1A"
+DIM     = "#555555"
+GOOD    = "#6A9E4F"
+WARN    = "#CC8800"
+BAD     = "#CC3333"
+
+console = Console(highlight=False)
+
+# ── System info collectors ─────────────────────────────────────
+
+def get_hostname():
+    return socket.gethostname()
+
+def get_kernel():
+    return subprocess.check_output(
+        ["uname", "-r"], text=True).strip()
+
+def get_uptime():
+    with open("/proc/uptime") as f:
+        seconds = float(f.read().split()[0])
+    td = timedelta(seconds=seconds)
+    hours, remainder = divmod(int(td.total_seconds()), 3600)
+    minutes = remainder // 60
+    if hours > 0:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+def get_cpu_usage():
+    """Read CPU usage from /proc/stat — two samples 0.1s apart."""
+    import time
+
+    def read_cpu():
+        with open("/proc/stat") as f:
+            line = f.readline()
+        vals = list(map(int, line.split()[1:]))
+        idle = vals[3]
+        total = sum(vals)
+        return idle, total
+
+    idle1, total1 = read_cpu()
+    time.sleep(0.1)
+    idle2, total2 = read_cpu()
+
+    idle_delta  = idle2  - idle1
+    total_delta = total2 - total1
+    usage = 100 * (1 - idle_delta / total_delta)
+    return round(usage)
+
+def get_memory():
+    """Parse /proc/meminfo for used/total RAM."""
+    meminfo = {}
+    with open("/proc/meminfo") as f:
+        for line in f:
+            key, val = line.split(":")
+            meminfo[key.strip()] = int(val.strip().split()[0])
+    total = meminfo["MemTotal"]
+    available = meminfo["MemAvailable"]
+    used = total - available
+    return used // 1024, total // 1024  # in MB
+
+def get_disk():
+    """Get disk usage for root partition."""
+    stat = shutil.disk_usage("/")
+    used_gb  = stat.used  / (1024 ** 3)
+    total_gb = stat.total / (1024 ** 3)
+    return used_gb, total_gb
+
+def get_cpu_model():
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if "model name" in line:
+                    return line.split(":")[1].strip()
+    except Exception:
+        pass
+    return "Unknown"
+
+# ── Manifest validation ────────────────────────────────────────
+
+MANIFEST_PATH = Path("/etc/ginkos/manifest.json")
+
+def load_manifest():
+    if not MANIFEST_PATH.exists():
+        return None
+    with open(MANIFEST_PATH) as f:
+        return json.load(f)
+
+def get_installed_versions(packages):
+    """Query dpkg for installed versions of given packages."""
+    result = {}
+    for pkg in packages:
+        try:
+            out = subprocess.check_output(
+                ["dpkg-query", "-W", "-f=${Version}", pkg],
+                text=True, stderr=subprocess.DEVNULL)
+            result[pkg] = out.strip()
+        except subprocess.CalledProcessError:
+            result[pkg] = None
+    return result
+
+def validate_manifest(manifest):
+    """
+    Compare installed package versions against the manifest.
+    Returns (ok_count, drifted_list)
+    """
+    installed = get_installed_versions(list(manifest.keys()))
+    ok = 0
+    drifted = []
+    for pkg, pinned_version in manifest.items():
+        actual = installed.get(pkg)
+        if actual == pinned_version:
+            ok += 1
+        else:
+            drifted.append((pkg, pinned_version, actual or "not installed"))
+    return ok, drifted
+
+# ── Progress bar renderer ──────────────────────────────────────
+
+def progress_bar(pct, width=12):
+    filled = int(width * pct / 100)
+    bar = "█" * filled + "░" * (width - filled)
+    color = GOOD if pct < 70 else WARN if pct < 90 else BAD
+    return f"[{color}]{bar}[/]  [{GOLD}]{pct}%[/]"
+
+# ── Main display ───────────────────────────────────────────────
+
+def main():
+    hostname   = get_hostname()
+    kernel     = get_kernel()
+    uptime     = get_uptime()
+    cpu_pct    = get_cpu_usage()
+    cpu_model  = get_cpu_model().split()[0:4]
+    cpu_short  = " ".join(cpu_model)
+    mem_used, mem_total = get_memory()
+    mem_pct    = round(100 * mem_used / mem_total)
+    disk_used, disk_total = get_disk()
+    disk_pct   = round(100 * disk_used / disk_total)
+
+    # Build info table
+    table = Table(box=None, show_header=False, padding=(0, 1))
+    table.add_column(style=f"bold {GOLD}", width=10)
+    table.add_column()
+
+    table.add_row("Host",   f"[bold white]{hostname}[/]")
+    table.add_row("Kernel", f"[{DIM}]{kernel}[/]")
+    table.add_row("Uptime", f"[white]{uptime}[/]")
+    table.add_row("CPU",    f"[{DIM}]{cpu_short}[/]  {progress_bar(cpu_pct)}")
+    table.add_row("Memory", f"[{DIM}]{mem_used}MB / {mem_total}MB[/]  {progress_bar(mem_pct)}")
+    table.add_row("Disk",   f"[{DIM}]{disk_used:.1f}GB / {disk_total:.1f}GB[/]  {progress_bar(disk_pct)}")
+
+    # Manifest validation
+    manifest = load_manifest()
+    if manifest:
+        ok_count, drifted = validate_manifest(manifest)
+        table.add_row("", "")
+        if not drifted:
+            table.add_row(
+                "Manifest",
+                f"[{GOOD}]✓ {ok_count} packages verified[/]")
+        else:
+            table.add_row(
+                "Manifest",
+                f"[{GOOD}]✓ {ok_count} verified[/]  "
+                f"[{WARN}]⚠ {len(drifted)} drifted — run gink-audit[/]")
+    else:
+        table.add_row("Manifest", f"[{DIM}]no manifest found — run gink-freeze[/]")
+
+    console.print()
+    console.print(Panel(
+        table,
+        title=f"[bold {GOLD}]GinkOS 1.0[/]",
+        subtitle=f"[{DIM}]maidenhair — auditable[/]",
+        border_style=GOLD,
+        padding=(1, 2)
+    ))
+    console.print()
+
+if __name__ == "__main__":
+    main()
