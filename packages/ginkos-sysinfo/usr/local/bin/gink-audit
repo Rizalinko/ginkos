@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""
+gink-audit — full manifest drift report
+Usage: gink-audit [--json]
+"""
+
+import json
+import sys
+import subprocess
+from pathlib import Path
+
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich import box
+except ImportError:
+    sys.exit("gink-audit: python3-rich required")
+
+MANIFEST_PATH = Path("/etc/ginkos/manifest.json")
+GOLD = "#C8A951"
+GOOD = "#6A9E4F"
+WARN = "#CC8800"
+BAD  = "#CC3333"
+
+console = Console()
+
+def get_installed(packages):
+    result = {}
+    for pkg in packages:
+        try:
+            out = subprocess.check_output(
+                ["dpkg-query", "-W", "-f=${Version}", pkg],
+                text=True, stderr=subprocess.DEVNULL)
+            result[pkg] = out.strip()
+        except subprocess.CalledProcessError:
+            result[pkg] = None
+    return result
+
+def main():
+    if not MANIFEST_PATH.exists():
+        console.print(f"[{BAD}]No manifest found. Run: sudo gink-freeze[/]")
+        sys.exit(1)
+
+    with open(MANIFEST_PATH) as f:
+        manifest = json.load(f)
+
+    # Strip metadata
+    packages = {k: v for k, v in manifest.items() if not k.startswith("_")}
+    installed = get_installed(list(packages.keys()))
+
+    ok, drifted, missing = [], [], []
+    for pkg, pinned in packages.items():
+        actual = installed.get(pkg)
+        if actual is None:
+            missing.append(pkg)
+        elif actual != pinned:
+            drifted.append((pkg, pinned, actual))
+        else:
+            ok.append(pkg)
+
+    # Summary
+    console.print()
+    console.print(f"[bold {GOLD}]GinkOS Manifest Audit[/]")
+    console.print(f"[{GOOD}]✓ {len(ok)} packages match manifest[/]")
+    if drifted:
+        console.print(f"[{WARN}]⚠ {len(drifted)} packages drifted[/]")
+    if missing:
+        console.print(f"[{BAD}]✗ {len(missing)} packages missing[/]")
+
+    if drifted:
+        console.print()
+        table = Table(
+            title="Drifted Packages",
+            box=box.SIMPLE,
+            title_style=f"bold {GOLD}")
+        table.add_column("Package",  style=f"bold {GOLD}")
+        table.add_column("Pinned",   style=GOOD)
+        table.add_column("Installed",style=WARN)
+        for pkg, pinned, actual in drifted:
+            table.add_row(pkg, pinned, actual)
+        console.print(table)
+
+    if missing:
+        console.print()
+        console.print(f"[{BAD}]Missing packages:[/]")
+        for pkg in missing:
+            console.print(f"  [{BAD}]✗[/] {pkg}")
+
+    console.print()
+    sys.exit(0 if not drifted and not missing else 1)
+
+if __name__ == "__main__":
+    main()
