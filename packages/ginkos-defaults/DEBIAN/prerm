@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+# Restore Debian os-release on removal
+if [ -f /etc/os-release.debian-backup ]; then
+    cp /etc/os-release.debian-backup /etc/os-release
+fi
+exit 0

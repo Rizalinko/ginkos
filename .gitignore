@@ -1,0 +1,7 @@
+rootfs/
+*.deb
+*.iso
+*.img
+repo/public/
+__pycache__/
+*.pyc

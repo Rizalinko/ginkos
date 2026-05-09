@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+# Replace os-release with GinkOS identity
+cp /etc/ginkos/os-release /etc/os-release
+
+# Set correct ownership on user configs
+if id gink &>/dev/null; then
+    chown -R gink:gink /home/gink/.config
+    chown gink:gink /home/gink/.bash_profile
+fi
+
+echo "GinkOS defaults installed."
+exit 0

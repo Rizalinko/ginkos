@@ -1,0 +1,9 @@
+Package: ginkos-defaults
+Version: 1.0.0
+Architecture: all
+Maintainer: Rizalina Mingazheva <rizalina.mingazheva@gmail.com>
+Depends: i3, i3status, alacritty, rofi, feh, picom, fonts-noto
+Description: GinkOS default configuration and branding
+ Provides the default i3 window manager configuration,
+ terminal settings, application launcher theme, wallpaper,
+ and system branding for GinkOS 1.0 (maidenhair).

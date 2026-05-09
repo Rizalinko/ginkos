@@ -1,0 +1,32 @@
+[window]
+padding = { x = 12, y = 12 }
+decorations = "none"
+opacity = 0.95
+
+[font]
+normal = { family = "Noto Sans Mono", style = "Regular" }
+size = 11.0
+
+[colors.primary]
+background = "#1A1A1A"
+foreground = "#C8A951"
+
+[colors.normal]
+black   = "#1A1A1A"
+red     = "#CC3333"
+green   = "#6A9E4F"
+yellow  = "#C8A951"
+blue    = "#4F7EA0"
+magenta = "#8B6FAE"
+cyan    = "#4FA08B"
+white   = "#CCCCCC"
+
+[colors.bright]
+black   = "#444444"
+red     = "#FF5555"
+green   = "#88CC66"
+yellow  = "#FFD700"
+blue    = "#6FA8C8"
+magenta = "#AA88CC"
+cyan    = "#66CCAA"
+white   = "#FFFFFF"
