@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+
+# Create manifest directory
+mkdir -p /etc/ginkos
+
+# Wire gink-info into system-wide bash login
+if ! grep -q "gink-info" /etc/bash.bashrc 2>/dev/null; then
+    echo "" >> /etc/bash.bashrc
+    echo "# GinkOS system info" >> /etc/bash.bashrc
+    echo 'command -v gink-info &>/dev/null && gink-info' >> /etc/bash.bashrc
+fi
+
+echo "ginkos-sysinfo installed. Run 'sudo gink-freeze' to pin your manifest."
+exit 0
