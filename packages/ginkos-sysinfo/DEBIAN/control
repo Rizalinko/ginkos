@@ -1,0 +1,13 @@
+Package: ginkos-sysinfo
+Version: 1.0.0
+Architecture: all
+Maintainer: Rizalina Mingazheva <your@email.com>
+Depends: python3 (>= 3.10), python3-rich, dpkg
+Recommends: ginkos-defaults
+Description: GinkOS system information and manifest validation tools
+ Provides three utilities:
+   gink-info   — displays system info and manifest status on login
+   gink-freeze — snapshots installed packages into a pinned manifest
+   gink-audit  — full drift report comparing system to manifest
+ These tools implement GinkOS's core design principle: every
+ deployment is auditable and reproducible.
