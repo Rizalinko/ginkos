@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""
+gink-freeze — snapshot installed packages into GinkOS manifest
+Usage: sudo gink-freeze
+"""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+from datetime import datetime
+
+MANIFEST_PATH = Path("/etc/ginkos/manifest.json")
+
+def get_all_installed():
+    out = subprocess.check_output(
+        ["dpkg-query", "-W", "-f=${Package}\t${Version}\n"],
+        text=True)
+    packages = {}
+    for line in out.strip().splitlines():
+        pkg, ver = line.split("\t")
+        packages[pkg] = ver
+    return packages
+
+def main():
+    if os.geteuid() != 0:
+        print("gink-freeze: must run as root (sudo gink-freeze)")
+        sys.exit(1)
+
+    print("GinkOS: snapshotting package manifest...")
+    packages = get_all_installed()
+
+    manifest = {
+        "_meta": {
+            "generated":  datetime.now().isoformat(),
+            "ginkos":     "1.0",
+            "codename":   "maidenhair",
+            "pkg_count":  len(packages)
+        },
+        **packages
+    }
+
+    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(MANIFEST_PATH, "w") as f:
+        json.dump(manifest, f, indent=2)
+
+    print(f"gink-freeze: {len(packages)} packages pinned → {MANIFEST_PATH}")
+
+import os
+if __name__ == "__main__":
+    main()
