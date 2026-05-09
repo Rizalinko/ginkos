@@ -59,6 +59,14 @@ if [[ ! -f "$PACKAGE_LIST" ]]; then
   exit 1
 fi
 
+SAFE_OUTPUT_DIR="$(readlink -m "$OUTPUT_DIR")"
+case "$SAFE_OUTPUT_DIR" in
+  ""|"/"|"/home"|"/root"|"/tmp")
+    echo "Refusing unsafe output directory: $SAFE_OUTPUT_DIR" >&2
+    exit 1
+    ;;
+esac
+
 ROOT_CMD=()
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   if [[ "$DRY_RUN" == false ]]; then
@@ -73,10 +81,17 @@ fi
 
 run_cmd mkdir -p "$(dirname "$OUTPUT_DIR")"
 run_cmd "${ROOT_CMD[@]}" rm -rf "$OUTPUT_DIR"
-run_cmd "${ROOT_CMD[@]}" debootstrap --arch="$ARCH" --variant=minbase "$RELEASE" "$OUTPUT_DIR" "$MIRROR"
-run_cmd "${ROOT_CMD[@]}" cp "$PACKAGE_LIST" "$OUTPUT_DIR/tmp/base-packages.txt"
+if ! run_cmd "${ROOT_CMD[@]}" debootstrap --arch="$ARCH" --variant=minbase "$RELEASE" "$OUTPUT_DIR" "$MIRROR"; then
+  echo "debootstrap failed. Verify release, mirror, and network connectivity." >&2
+  exit 1
+fi
 run_cmd "${ROOT_CMD[@]}" chroot "$OUTPUT_DIR" apt-get update
-run_cmd "${ROOT_CMD[@]}" chroot "$OUTPUT_DIR" xargs -a /tmp/base-packages.txt apt-get install -y
-run_cmd "${ROOT_CMD[@]}" chroot "$OUTPUT_DIR" rm -f /tmp/base-packages.txt
+while IFS= read -r package; do
+  [[ -z "$package" || "$package" == \#* ]] && continue
+  if ! run_cmd "${ROOT_CMD[@]}" chroot "$OUTPUT_DIR" apt-get install -y "$package"; then
+    echo "Failed to install package: $package" >&2
+    exit 1
+  fi
+done < "$PACKAGE_LIST"
 
 echo "Debian foundation created at: $OUTPUT_DIR"
