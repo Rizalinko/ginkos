@@ -66,6 +66,7 @@ case "$SAFE_OUTPUT_DIR" in
     exit 1
     ;;
 esac
+OUTPUT_DIR="$SAFE_OUTPUT_DIR"
 
 ROOT_CMD=()
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
@@ -80,6 +81,10 @@ if [[ "$DRY_RUN" == false ]]; then
 fi
 
 run_cmd mkdir -p "$(dirname "$OUTPUT_DIR")"
+if [[ -z "$OUTPUT_DIR" || "$OUTPUT_DIR" != /* ]]; then
+  echo "Refusing invalid output directory: $OUTPUT_DIR" >&2
+  exit 1
+fi
 run_cmd "${ROOT_CMD[@]}" rm -rf "$OUTPUT_DIR"
 if ! run_cmd "${ROOT_CMD[@]}" debootstrap --arch="$ARCH" --variant=minbase "$RELEASE" "$OUTPUT_DIR" "$MIRROR"; then
   echo "debootstrap failed. Verify release, mirror, and network connectivity." >&2
