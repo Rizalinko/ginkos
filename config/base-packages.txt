@@ -1,0 +1,11 @@
+ca-certificates
+curl
+iproute2
+iputils-ping
+less
+locales
+nano
+net-tools
+sudo
+systemd-sysv
+vim-tiny
