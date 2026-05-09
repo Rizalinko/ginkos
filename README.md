@@ -1,1 +1,1 @@
-# RizzOS
+# GinkOS
