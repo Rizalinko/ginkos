@@ -1,0 +1,14 @@
+{
+  "rootDir": "<path-to-your-ginkos-repo>",
+  "downloadConcurrency": 4,
+  "downloadSpeedLimit": 0,
+  "architectures": ["amd64"],
+  "dependencyFollowSuggests": false,
+  "dependencyFollowRecommends": false,
+  "gpgDisableSign": false,
+  "gpgDisableVerify": false,
+  "downloadSourcePackages": false,
+  "skipLegacyPool": true,
+  "ppaDistributorID": "ginkos",
+  "ppaCodename": ""
+}
